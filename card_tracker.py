@@ -27,6 +27,8 @@ def get_app_password():
     """Streamlit Secretsからアプリケーションパスワードを取得する"""
     if hasattr(st, 'secrets') and "app_credentials" in st.secrets and "password" in st.secrets["app_credentials"]:
         return st.secrets["app_credentials"]["password"]
+
+CORRECT_PASSWORD = get_app_password()
     
 # --- Google Sheets 連携 ---
 SCOPES = [
