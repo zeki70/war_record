@@ -165,7 +165,52 @@ def load_data(spreadsheet_id, worksheet_name): # ← この行を確認！
             df[col] = df[col].astype(str).fillna('')
     return df
 
-def save_data(df, file_path): # 変更なし
+# save_data 関数の修正版
+def save_data(df_one_row, spreadsheet_id, worksheet_name):
+    client = get_gspread_client() # この関数は変更なし
+    if client is None:
+        st.error("Google Sheetsに接続できなかったため、データを保存できませんでした。")
+        return False
+
+    try:
+        spreadsheet = client.open_by_key(spreadsheet_id)
+        worksheet = spreadsheet.worksheet(worksheet_name)
+        
+        current_headers = []
+        if worksheet.row_count > 0:
+            current_headers = worksheet.row_values(1)
+
+        # ヘッダー行が存在しないか、COLUMNSと一致しない場合にヘッダーを書き込む/修正する
+        if not current_headers or len(current_headers) < len(COLUMNS) or current_headers[:len(COLUMNS)] != COLUMNS :
+            worksheet.update('A1', [COLUMNS], value_input_option='USER_ENTERED')
+            if not current_headers: 
+                st.info("スプレッドシートにヘッダー行を書き込みました。")
+            else:
+                st.warning("スプレッドシートのヘッダーを修正しました。")
+
+        data_to_append = []
+        for col in COLUMNS:
+            if col in df_one_row.columns:
+                value = df_one_row.iloc[0][col]
+                # --- ここからが முக்கிய修正箇所 ---
+                if pd.isna(value): # NaN, NaT, None を統一的にチェック
+                    data_to_append.append("") 
+                elif col == 'date' and isinstance(value, (datetime, pd.Timestamp)):
+                     # pd.notna(value) は isinstance で保証されているので、直接 strftime
+                     data_to_append.append(value.strftime('%Y-%m-%d'))
+                elif col == 'finish_turn' and pd.notna(value): # pd.notna で <NA> (Int64の欠損値) も False になる
+                     data_to_append.append(int(value)) 
+                else: 
+                    data_to_append.append(str(value)) # その他の型は文字列に変換
+                # --- ここまでが முக்கிய修正箇所 ---
+            else:
+                data_to_append.append("")
+        
+        worksheet.append_row(data_to_append, value_input_option='USER_ENTERED')
+        return True
+    except Exception as e:
+        st.error(f"Google Sheetsへのデータ書き込み中にエラーが発生しました: {type(e).__name__}: {e}")
+        return False
     # ... (コードは前回と同じ)
     for col in COLUMNS:
         if col not in df.columns:
