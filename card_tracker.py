@@ -460,7 +460,6 @@ def show_analysis_section(original_df):
 # --- Streamlit アプリ本体 (main関数) ---
 def main():
     st.set_page_config(layout="wide")
-    st.write(f"DEBUG: CORRECT_PASSWORD = '{CORRECT_PASSWORD}'")
     # --- パスワード認証 ---
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False # 初期状態は未認証
