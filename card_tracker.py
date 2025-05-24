@@ -107,8 +107,7 @@ def load_data(spreadsheet_id, worksheet_name): # ← この行を確認！
                 else: temp_df[col] = pd.Series(dtype='object')
         df = temp_df
 
-        # データチューニング
-の変換とfillna
+        # データチューニングの変換とfillna
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'], errors='coerce')
         if 'finish_turn' in df.columns:
