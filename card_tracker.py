@@ -527,8 +527,7 @@ def main():
                 st.text_input("新しい使用デッキ名を入力 *", value=st.session_state.get('inp_my_deck_new', ""), key='inp_my_deck_new')
             my_deck_name_for_type_options = st.session_state.get('inp_my_deck', NEW_ENTRY_LABEL)
             my_deck_type_options = get_types_for_deck(df, my_deck_name_for_type_options)
-            st.selectbox("使用デッキのチューニング
- *", my_deck_type_options, key='inp_my_deck_type')
+            st.selectbox("使用デッキのチューニング *", my_deck_type_options, key='inp_my_deck_type')
             if st.session_state.get('inp_my_deck_type') == NEW_ENTRY_LABEL:
                 st.text_input("新しい使用デッキのチューニングを入力 *", value=st.session_state.get('inp_my_deck_type_new', ""), key='inp_my_deck_type_new')
         with col2:
