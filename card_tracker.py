@@ -279,7 +279,7 @@ def show_analysis_section(original_df):
     st.selectbox("注目するデッキアーキタイプを選択:", options=deck_names_for_focus_options, key='ana_focus_deck_name', on_change=reset_focus_type)
     selected_focus_deck = st.session_state.get('ana_focus_deck_name')
     types_for_focus_deck_options = get_all_types_for_archetype(df_for_analysis, selected_focus_deck)
-    st.selectbox("注目デッキのチューニングを選択 (「全タイプ」でチューニングを問わず集計):", options=types_for_focus_deck_options, key='ana_focus_deck_type')
+    st.selectbox("注目デッキのチューニング(特になかったらテンプレで)を選択 (「全タイプ」でチューニングを問わず集計):", options=types_for_focus_deck_options, key='ana_focus_deck_type')
     selected_focus_type = st.session_state.get('ana_focus_deck_type')
 
     if selected_focus_deck and selected_focus_deck != SELECT_PLACEHOLDER:
@@ -367,7 +367,7 @@ def show_analysis_section(original_df):
                 avg_win_turn = pd.Series(focus_deck_win_turns_vs_opp).mean() if focus_deck_win_turns_vs_opp else None
                 avg_loss_turn = pd.Series(focus_deck_loss_turns_vs_opp).mean() if focus_deck_loss_turns_vs_opp else None
                 matchup_data.append({
-                    "対戦相手デッキ": opp_deck_name, "対戦相手デッキのチューニング": opp_deck_type,
+                    "対戦相手デッキ": opp_deck_name, "対戦相手デッキのチューニング(特になかったらテンプレで)": opp_deck_type,
                     "対戦数": games_played_count, "(注目デッキの)勝利数": focus_deck_wins_count,
                     "(注目デッキの)勝率(%)": opponent_win_rate,
                     "勝利時平均ターン": avg_win_turn, "敗北時平均ターン": avg_loss_turn
@@ -400,14 +400,14 @@ def show_analysis_section(original_df):
                     avg_win_turn_agg = pd.Series(all_win_turns_agg).mean() if all_win_turns_agg else None
                     avg_loss_turn_agg = pd.Series(all_loss_turns_agg).mean() if all_loss_turns_agg else None
                     agg_matchup_data.append({
-                        "対戦相手デッキ": opp_deck_name_agg, "対戦相手デッキのチューニング": ALL_TYPES_PLACEHOLDER,
+                        "対戦相手デッキ": opp_deck_name_agg, "対戦相手デッキのチューニング(特になかったらテンプレで)": ALL_TYPES_PLACEHOLDER,
                         "対戦数": total_games_vs_opp_deck_agg, "(注目デッキの)勝利数": total_focus_wins_vs_opp_deck_agg,
                         "(注目デッキの)勝率(%)": win_rate_vs_opp_deck_agg,
                         "勝利時平均ターン": avg_win_turn_agg, "敗北時平均ターン": avg_loss_turn_agg
                     })
             matchup_df_all_types = pd.DataFrame(agg_matchup_data)
             matchup_df_combined = pd.concat([matchup_df_specific_types, matchup_df_all_types], ignore_index=True)
-            matchup_df_combined['__sort_type'] = matchup_df_combined['対戦相手デッキのチューニング'].apply(
+            matchup_df_combined['__sort_type'] = matchup_df_combined['対戦相手デッキのチューニング(特になかったらテンプレで)'].apply(
                 lambda x: ('0_AllTypes' if x == ALL_TYPES_PLACEHOLDER else '1_' + str(x)))
             matchup_df_final = matchup_df_combined.sort_values(
                 by=["対戦相手デッキ", "__sort_type"]
@@ -527,9 +527,9 @@ def main():
                 st.text_input("新しい使用デッキ名を入力 *", value=st.session_state.get('inp_my_deck_new', ""), key='inp_my_deck_new')
             my_deck_name_for_type_options = st.session_state.get('inp_my_deck', NEW_ENTRY_LABEL)
             my_deck_type_options = get_types_for_deck(df, my_deck_name_for_type_options)
-            st.selectbox("使用デッキのチューニング *", my_deck_type_options, key='inp_my_deck_type')
+            st.selectbox("使用デッキのチューニング(特になかったらテンプレで) *", my_deck_type_options, key='inp_my_deck_type')
             if st.session_state.get('inp_my_deck_type') == NEW_ENTRY_LABEL:
-                st.text_input("新しい使用デッキのチューニングを入力 *", value=st.session_state.get('inp_my_deck_type_new', ""), key='inp_my_deck_type_new')
+                st.text_input("新しい使用デッキのチューニング(特になかったらテンプレで)を入力 *", value=st.session_state.get('inp_my_deck_type_new', ""), key='inp_my_deck_type_new')
         with col2:
             st.subheader("対戦相手のデッキ")
             st.selectbox("相手デッキ *", deck_name_options, key='inp_opponent_deck')
@@ -537,9 +537,9 @@ def main():
                 st.text_input("新しい相手デッキ名を入力 *", value=st.session_state.get('inp_opponent_deck_new', ""), key='inp_opponent_deck_new')
             opponent_deck_name_for_type_options = st.session_state.get('inp_opponent_deck', NEW_ENTRY_LABEL)
             opponent_deck_type_options = get_types_for_deck(df, opponent_deck_name_for_type_options)
-            st.selectbox("相手デッキのチューニング *", opponent_deck_type_options, key='inp_opponent_deck_type')
+            st.selectbox("相手デッキのチューニング(特になかったらテンプレで) *", opponent_deck_type_options, key='inp_opponent_deck_type')
             if st.session_state.get('inp_opponent_deck_type') == NEW_ENTRY_LABEL:
-                st.text_input("新しい相手デッキのチューニングを入力 *", value=st.session_state.get('inp_opponent_deck_type_new', ""), key='inp_opponent_deck_type_new')
+                st.text_input("新しい相手デッキのチューニング(特になかったらテンプレで)を入力 *", value=st.session_state.get('inp_opponent_deck_type_new', ""), key='inp_opponent_deck_type_new')
         
         st.subheader("対戦結果")
         res_col1, res_col2, res_col3 = st.columns(3)
@@ -582,9 +582,9 @@ def main():
             if not final_season or final_season == NEW_ENTRY_LABEL: error_messages.append("シーズンを入力または選択してください。")
             # ... (他のバリデーションも同様) ...
             if not final_my_deck or final_my_deck == NEW_ENTRY_LABEL: error_messages.append("使用デッキ名を入力または選択してください。")
-            if not final_my_deck_type or final_my_deck_type == NEW_ENTRY_LABEL: error_messages.append("使用デッキのチューニングを入力または選択してください。")
+            if not final_my_deck_type or final_my_deck_type == NEW_ENTRY_LABEL: error_messages.append("使用デッキのチューニング(特になかったらテンプレで)を入力または選択してください。")
             if not final_opponent_deck or final_opponent_deck == NEW_ENTRY_LABEL: error_messages.append("相手デッキ名を入力または選択してください。")
-            if not final_opponent_deck_type or final_opponent_deck_type == NEW_ENTRY_LABEL: error_messages.append("相手デッキのチューニングを入力または選択してください。")
+            if not final_opponent_deck_type or final_opponent_deck_type == NEW_ENTRY_LABEL: error_messages.append("相手デッキのチューニング(特になかったらテンプレで)を入力または選択してください。")
             if finish_turn_val is None: error_messages.append("決着ターンを入力してください。")
 
 
