@@ -22,7 +22,12 @@ COLUMNS = [
 NEW_ENTRY_LABEL = "（新しい値を入力）"
 SELECT_PLACEHOLDER = "--- 選択してください ---"
 ALL_TYPES_PLACEHOLDER = "全タイプ"
-# --- データ操作関数 (変更なし) ---
+# --- データ操作関数 (変更なし) ---# --- パスワード認証のための設定 ---
+def get_app_password():
+    """Streamlit Secretsからアプリケーションパスワードを取得する"""
+    if hasattr(st, 'secrets') and "app_credentials" in st.secrets and "password" in st.secrets["app_credentials"]:
+        return st.secrets["app_credentials"]["password"]
+    
 # --- Google Sheets 連携 ---
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -453,7 +458,26 @@ def show_analysis_section(original_df):
 # --- Streamlit アプリ本体 (main関数) ---
 def main():
     st.set_page_config(layout="wide")
-    st.title("カードゲーム戦績管理アプリ")
+
+    # --- パスワード認証 ---
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False # 初期状態は未認証
+
+    if not st.session_state.authenticated:
+        st.title("アプリへのログイン")
+        password_placeholder = st.empty()
+        password_input = password_placeholder.text_input("パスワードを入力してください:", type="password", key="password_input_field")
+        
+        if st.button("ログイン", key="login_button"):
+            if password_input == CORRECT_PASSWORD:
+                st.session_state.authenticated = True
+                password_placeholder.empty() # 入力フィールドを消す
+                st.experimental_rerun() # 認証成功後にページを再読み込みしてコンテンツ表示
+            else:
+                st.error("パスワードが正しくありません。")
+        st.stop() # 未認証の場合はここで処理を停止し、以下のメインコンテンツを表示しない
+
+    st.title("Waic戦績管理アプリ")
 
     # ★★★ SPREADSHEET_ID をご自身のIDに置き換えてください ★★★
     # SPREADSHEET_ID = "ここに実際の Waic-戦績 のスプレッドシートIDを貼り付け" 
