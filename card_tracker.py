@@ -473,7 +473,7 @@ def main():
             if password_input == CORRECT_PASSWORD:
                 st.session_state.authenticated = True
                 password_placeholder.empty() # 入力フィールドを消す
-                st.experimental_rerun() # 認証成功後にページを再読み込みしてコンテンツ表示
+                st.rerun() # 認証成功後にページを再読み込みしてコンテンツ表示
             else:
                 st.error("パスワードが正しくありません。")
         st.stop() # 未認証の場合はここで処理を停止し、以下のメインコンテンツを表示しない
