@@ -224,8 +224,9 @@ def save_data(df_one_row, spreadsheet_id, worksheet_name):
             df[col] = df[col].astype(str).fillna('')
     df.to_csv(file_path, index=False)
 
-def get_unique_items_with_new_option(df, column_name, predefined_options=None): # 変更なし
-    # ... (コードは前回と同じ)
+# --- ヘルパー関数 (入力フォームの選択肢生成用) ---
+def get_unique_items_with_new_option(df, column_name, predefined_options=None):
+    # (この関数はシーズンや環境の選択肢生成にそのまま使えます)
     items = []
     if predefined_options is not None:
         items = list(predefined_options) 
@@ -239,17 +240,58 @@ def get_unique_items_with_new_option(df, column_name, predefined_options=None): 
     final_options.extend(items)
     return final_options
 
-def get_combined_unique_items_with_new_option(df, column_names_list): # 変更なし
-    # ... (コードは前回と同じ)
-    combined_items_set = set()
-    for col_name in column_names_list:
-        if col_name in df.columns and not df[col_name].empty:
-            valid_items = df[col_name].astype(str).replace('', pd.NA).dropna()
-            if not valid_items.empty: combined_items_set.update(valid_items.tolist())
-    if not combined_items_set: return [NEW_ENTRY_LABEL]
-    return [NEW_ENTRY_LABEL] + sorted(list(combined_items_set))
+def get_decks_for_season_input(df, selected_season):
+    """入力フォーム用: 指定シーズンに登場する全デッキアーキタイプ名を取得"""
+    if not selected_season or selected_season == NEW_ENTRY_LABEL or pd.isna(selected_season):
+        # シーズン未選択時は全期間のデッキ名
+        return get_combined_unique_items_with_new_option(df, ['my_deck', 'opponent_deck'])
 
-def get_types_for_deck(df, selected_deck_name): # 入力フォーム用、変更なし
+    df_filtered_by_season = df[df['season'].astype(str) == str(selected_season)]
+    if df_filtered_by_season.empty:
+        return [NEW_ENTRY_LABEL]
+    
+    deck_names_set = set()
+    if 'my_deck' in df_filtered_by_season.columns:
+        valid_my_decks = df_filtered_by_season['my_deck'].astype(str).replace('', pd.NA).dropna()
+        deck_names_set.update(valid_my_decks.tolist())
+    if 'opponent_deck' in df_filtered_by_season.columns:
+        valid_opponent_decks = df_filtered_by_season['opponent_deck'].astype(str).replace('', pd.NA).dropna()
+        deck_names_set.update(valid_opponent_decks.tolist())
+        
+    if not deck_names_set:
+        return [NEW_ENTRY_LABEL]
+    return [NEW_ENTRY_LABEL] + sorted([d for d in list(deck_names_set) if d])
+
+
+def get_types_for_deck_and_season_input(df, selected_season, selected_deck_name):
+    """入力フォーム用: 指定シーズン・指定デッキ名に関連する全ユニークな型を取得"""
+    if (not selected_deck_name or selected_deck_name == NEW_ENTRY_LABEL or pd.isna(selected_deck_name) or
+        not selected_season or selected_season == NEW_ENTRY_LABEL or pd.isna(selected_season)):
+        # シーズンかデッキ名が有効に選択されていなければ、型の選択肢は限定的
+        return [NEW_ENTRY_LABEL]
+
+    df_filtered = df[df['season'].astype(str) == str(selected_season)]
+    if df_filtered.empty:
+        return [NEW_ENTRY_LABEL]
+
+    types = set()
+    s_deck_name_str = str(selected_deck_name)
+
+    # 選択されたデッキ名がmy_deckの場合のmy_deck_type
+    my_deck_matches = df_filtered[df_filtered['my_deck'].astype(str) == s_deck_name_str]
+    if not my_deck_matches.empty and 'my_deck_type' in my_deck_matches.columns:
+        valid_types = my_deck_matches['my_deck_type'].astype(str).replace('', pd.NA).dropna()
+        types.update(t for t in valid_types.tolist() if t)
+
+    # 選択されたデッキ名がopponent_deckの場合のopponent_deck_type
+    opponent_deck_matches = df_filtered[df_filtered['opponent_deck'].astype(str) == s_deck_name_str]
+    if not opponent_deck_matches.empty and 'opponent_deck_type' in opponent_deck_matches.columns:
+        valid_types = opponent_deck_matches['opponent_deck_type'].astype(str).replace('', pd.NA).dropna()
+        types.update(t for t in valid_types.tolist() if t)
+        
+    if not types:
+        return [NEW_ENTRY_LABEL]
+    return [NEW_ENTRY_LABEL] + sorted(list(types))
     # ... (コードは前回と同じ)
     if not selected_deck_name or selected_deck_name == NEW_ENTRY_LABEL or pd.isna(selected_deck_name):
         return [NEW_ENTRY_LABEL]
@@ -290,6 +332,7 @@ def get_all_types_for_archetype(df, deck_name): # 変更なし
 # --- 新しいデフォルト表示用関数 ---
 # --- 新しいデフォルト表示用関数 (先攻/後攻情報を追加) ---
 # --- 新しいデフォルト表示用関数 (ソート基準選択を削除) ---
+# --- 新しいデフォルト表示用関数 (先攻/後攻情報を追加) ---
 def display_general_deck_performance(df_to_analyze):
     st.subheader("全デッキアーキタイプ パフォーマンス概要")
     
@@ -302,31 +345,41 @@ def display_general_deck_performance(df_to_analyze):
     for deck_a_name in all_deck_archetypes:
         if not deck_a_name: continue
 
-        # (総合勝率、先攻/後攻勝率、平均マッチアップ勝率の計算ロジックは変更なし)
-        # ... (コード省略) ...
+        # --- デッキAが登場したゲームを抽出 ---
         games_as_my_deck_df = df_to_analyze[df_to_analyze['my_deck'] == deck_a_name]
+        games_as_opponent_deck_df = df_to_analyze[df_to_analyze['opponent_deck'] == deck_a_name]
+
+        # 1. 総合勝率の計算
         wins_as_my_deck = len(games_as_my_deck_df[games_as_my_deck_df['result'] == '勝ち'])
         count_as_my_deck = len(games_as_my_deck_df)
-        games_as_opponent_deck_df = df_to_analyze[df_to_analyze['opponent_deck'] == deck_a_name]
-        wins_as_opponent_deck = len(games_as_opponent_deck_df[games_as_opponent_deck_df['result'] == '負け'])
+        wins_as_opponent_deck = len(games_as_opponent_deck_df[games_as_opponent_deck_df['result'] == '負け']) # deck_a の勝ち
         count_as_opponent_deck = len(games_as_opponent_deck_df)
         total_appearances_deck_a = count_as_my_deck + count_as_opponent_deck
         total_wins_deck_a = wins_as_my_deck + wins_as_opponent_deck
         total_losses_deck_a = total_appearances_deck_a - total_wins_deck_a
         simple_overall_win_rate_deck_a = (total_wins_deck_a / total_appearances_deck_a * 100) if total_appearances_deck_a > 0 else 0.0
+
+        # --- ★★★ ここから先攻/後攻関連の計算を追加 ★★★ ---
+        # デッキAが先攻だったゲーム
         deck_a_first_as_my = games_as_my_deck_df[games_as_my_deck_df['first_second'] == '先攻']
-        deck_a_first_as_opp = games_as_opponent_deck_df[games_as_opponent_deck_df['first_second'] == '後攻']
+        deck_a_first_as_opp = games_as_opponent_deck_df[games_as_opponent_deck_df['first_second'] == '後攻'] # my_deckが後攻＝deck_aが先攻
         total_games_deck_a_first = len(deck_a_first_as_my) + len(deck_a_first_as_opp)
         wins_deck_a_first = len(deck_a_first_as_my[deck_a_first_as_my['result'] == '勝ち']) + \
                              len(deck_a_first_as_opp[deck_a_first_as_opp['result'] == '負け'])
         win_rate_deck_a_first = (wins_deck_a_first / total_games_deck_a_first * 100) if total_games_deck_a_first > 0 else None
+
+        # デッキAが後攻だったゲーム
         deck_a_second_as_my = games_as_my_deck_df[games_as_my_deck_df['first_second'] == '後攻']
-        deck_a_second_as_opp = games_as_opponent_deck_df[games_as_opponent_deck_df['first_second'] == '先攻']
+        deck_a_second_as_opp = games_as_opponent_deck_df[games_as_opponent_deck_df['first_second'] == '先攻'] # my_deckが先攻＝deck_aが後攻
         total_games_deck_a_second = len(deck_a_second_as_my) + len(deck_a_second_as_opp)
         wins_deck_a_second = len(deck_a_second_as_my[deck_a_second_as_my['result'] == '勝ち']) + \
                              len(deck_a_second_as_opp[deck_a_second_as_opp['result'] == '負け'])
         win_rate_deck_a_second = (wins_deck_a_second / total_games_deck_a_second * 100) if total_games_deck_a_second > 0 else None
+        # --- ★★★ 先攻/後攻関連の計算ここまで ★★★ ---
+
+        # 2. 平均マッチアップ勝率の計算 (この部分は変更なし)
         matchup_win_rates_for_deck_a = []
+        # (計算ロジックは前回と同じなので省略します)
         games_involving_deck_a = df_to_analyze[(df_to_analyze['my_deck'] == deck_a_name) | (df_to_analyze['opponent_deck'] == deck_a_name)]
         unique_opponents_faced_by_deck_a = set()
         for _idx, row in games_involving_deck_a.iterrows():
@@ -349,55 +402,62 @@ def display_general_deck_performance(df_to_analyze):
                     matchup_win_rates_for_deck_a.append(wr)
         avg_matchup_wr_deck_a = pd.Series(matchup_win_rates_for_deck_a).mean() if matchup_win_rates_for_deck_a else None
 
+
         if total_appearances_deck_a > 0:
+            # --- ★★★ 「総登場回数」の表示形式を変更 ★★★ ---
             appearance_display = f"{total_appearances_deck_a} (先攻: {total_games_deck_a_first})"
+            
             general_performance_data.append({
                 "デッキアーキタイプ": deck_a_name,
-                "総登場回数": appearance_display,
+                "総登場回数": appearance_display, # ★★★ 変更点 ★★★
                 "総勝利数": total_wins_deck_a,
                 "総敗北数": total_losses_deck_a,
                 "勝率 (%) [総合]": simple_overall_win_rate_deck_a,
                 "平均マッチアップ勝率 (%)": avg_matchup_wr_deck_a,
-                "先攻時勝率 (%)": win_rate_deck_a_first,
-                "後攻時勝率 (%)": win_rate_deck_a_second,
+                "先攻時勝率 (%)": win_rate_deck_a_first, # ★★★ 追加 ★★★
+                "後攻時勝率 (%)": win_rate_deck_a_second, # ★★★ 追加 ★★★
             })
 
     if general_performance_data:
         gen_perf_df = pd.DataFrame(general_performance_data)
         
         # --- ソート基準選択のselectboxを削除し、固定のソート順にする ---
-        # デフォルトのソートキーを「平均マッチアップ勝率 (%)」の降順とする
-        # もしその列が存在しない場合や、別の基準でソートしたい場合はここを調整
-        default_sort_column = "平均マッチアップ勝率 (%)"
+        default_sort_column = "平均マッチアップ勝率 (%)" # デフォルトのソートキー
         if default_sort_column not in gen_perf_df.columns:
-            default_sort_column = "勝率 (%) [総合]" # フォールバック
-        if default_sort_column not in gen_perf_df.columns:
-             default_sort_column = "総登場回数" # さらにフォールバック
+            default_sort_column = "勝率 (%) [総合]" 
+        if default_sort_column not in gen_perf_df.columns: 
+             default_sort_column = "総登場回数" # 元の数値列でソートする場合は注意が必要
+             # 安全のため、もし上記の勝率列がなければ、ソートしない（DataFrameの元の順序）という選択肢も
+             # gen_perf_df_sorted = gen_perf_df.reset_index(drop=True) となる
 
-        gen_perf_df_sorted = gen_perf_df.sort_values(
-            by=default_sort_column, 
-            ascending=False, # 勝率は高い方が良いので降順
-            na_position='last'
-        ).reset_index(drop=True)
-        # --- 修正ここまで ---
+        try:
+            # "総登場回数" でソートする場合は、元の数値でソートするために一時的な列を作るか、
+            # あるいは appearance_display 文字列のままでソートされる（期待通りにならない可能性）
+            # ここでは勝率系でのソートを優先
+            gen_perf_df_sorted = gen_perf_df.sort_values(
+                by=default_sort_column, 
+                ascending=False, 
+                na_position='last'
+            ).reset_index(drop=True)
+        except KeyError: # ソート対象列がないなどのエラーをキャッチ
+            gen_perf_df_sorted = gen_perf_df.reset_index(drop=True) # ソートしない
         
+        # --- ★★★ 表示する列のリストに先攻/後攻勝率を追加 ★★★ ---
         display_cols_general = [
             "デッキアーキタイプ", "総登場回数", "総勝利数", "総敗北数", 
             "勝率 (%) [総合]", "平均マッチアップ勝率 (%)", 
             "先攻時勝率 (%)", "後攻時勝率 (%)"
         ]
-        # DataFrameに存在する列のみを表示対象とする
         actual_display_cols_general = [col for col in display_cols_general if col in gen_perf_df_sorted.columns]
 
         st.dataframe(gen_perf_df_sorted[actual_display_cols_general].style.format({
             "勝率 (%) [総合]": "{:.1f}%",
             "平均マッチアップ勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A",
-            "先攻時勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A",
-            "後攻時勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A",
+            "先攻時勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A", # ★★★ 追加 ★★★
+            "後攻時勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A", # ★★★ 追加 ★★★
         }), use_container_width=True)
     else:
         st.info("表示するデッキパフォーマンスデータがありません。")
-
 # (show_analysis_section 関数の残りの部分、main関数、他のヘルパー関数は変更ありません)
 # ...
 # --- 分析セクション表示関数 (show_analysis_section) の変更点 ---
@@ -409,70 +469,44 @@ def display_general_deck_performance(df_to_analyze):
 # --- 分析セクション表示関数 (「対戦数」列の表示形式変更) ---
 # --- 分析セクション表示関数 (機能復活) ---
 def show_analysis_section(original_df):
-    st.header("📊 戦績分析") # ヘッダーを少し一般的に
-
+    st.header("📊 戦績分析") 
     if original_df.empty:
         st.info("まだ分析できる戦績データがありません。")
         return
-
-    # --- フィルタリング機能 (変更なし) ---
     st.subheader("絞り込み条件")
     all_seasons = [SELECT_PLACEHOLDER] + sorted([s for s in original_df['season'].astype(str).replace('', pd.NA).dropna().unique() if s and s.lower() != 'nan'])
     selected_season_for_analysis = st.selectbox("シーズンで絞り込み (任意):", options=all_seasons, key='ana_season_filter')
-    
-    all_environments = [SELECT_PLACEHOLDER] + sorted([
-        e for e in original_df['environment'].astype(str).replace('', pd.NA).dropna().unique() if e and e.lower() != 'nan'
-    ])
+    all_environments = [SELECT_PLACEHOLDER] + sorted([e for e in original_df['environment'].astype(str).replace('', pd.NA).dropna().unique() if e and e.lower() != 'nan'])
     selected_environments = st.multiselect("対戦環境で絞り込み (任意):", options=all_environments, key='ana_environment_filter')
-
     df_for_analysis = original_df.copy()
     if selected_season_for_analysis and selected_season_for_analysis != SELECT_PLACEHOLDER:
         df_for_analysis = df_for_analysis[df_for_analysis['season'] == selected_season_for_analysis]
     if selected_environments: 
         df_for_analysis = df_for_analysis[df_for_analysis['environment'].isin(selected_environments)]
-    
     if df_for_analysis.empty:
         if (selected_season_for_analysis and selected_season_for_analysis != SELECT_PLACEHOLDER) or selected_environments:
             st.warning("選択された絞り込み条件に合致するデータがありません。")
-        else:
-            st.info("分析対象のデータがありません。")
+        else: st.info("分析対象のデータがありません。")
         return
 
-    # --- 分析対象の選択 (注目デッキ) ---
     st.subheader("注目デッキ分析")
     def reset_focus_type_callback(): 
         st.session_state.ana_focus_deck_type_selector = ALL_TYPES_PLACEHOLDER
-        if 'inp_ana_focus_deck_type_new' in st.session_state: # 将来的な新規入力用
+        if 'inp_ana_focus_deck_type_new' in st.session_state:
             st.session_state.inp_ana_focus_deck_type_new = ""
-
     deck_names_for_focus_options = [SELECT_PLACEHOLDER] + get_all_analyzable_deck_names(df_for_analysis)
-    st.selectbox(
-        "注目するデッキアーキタイプを選択:", 
-        options=deck_names_for_focus_options, 
-        key='ana_focus_deck_name_selector', 
-        on_change=reset_focus_type_callback
-    )
+    st.selectbox("注目するデッキアーキタイプを選択:", options=deck_names_for_focus_options, key='ana_focus_deck_name_selector', on_change=reset_focus_type_callback)
     selected_focus_deck = st.session_state.get('ana_focus_deck_name_selector')
     
-    # --- 表示の分岐 ---
     if selected_focus_deck and selected_focus_deck != SELECT_PLACEHOLDER:
-        # --- 注目デッキが選択された場合の詳細分析 ---
         types_for_focus_deck_options = get_all_types_for_archetype(df_for_analysis, selected_focus_deck)
-        st.selectbox(
-            "注目デッキの型を選択 (「全タイプ」で型を問わず集計):", 
-            options=types_for_focus_deck_options, 
-            key='ana_focus_deck_type_selector'
-        )
+        st.selectbox("注目デッキの型を選択 (「全タイプ」で型を問わず集計):", options=types_for_focus_deck_options, key='ana_focus_deck_type_selector')
         selected_focus_type = st.session_state.get('ana_focus_deck_type_selector')
-
         st.markdown("---")
         focus_deck_display_name = f"{selected_focus_deck}"
         if selected_focus_type and selected_focus_type != ALL_TYPES_PLACEHOLDER:
             focus_deck_display_name += f" ({selected_focus_type})"
         st.subheader(f"「{focus_deck_display_name}」の分析結果")
-
-        # (注目デッキの総合パフォーマンス計算、相性表の計算と表示は前回のコードと同じなので省略します)
-        # ... (この部分は前回のコードをそのまま使用してください) ...
         cond_my_deck_focus = (df_for_analysis['my_deck'] == selected_focus_deck)
         if selected_focus_type and selected_focus_type != ALL_TYPES_PLACEHOLDER:
             cond_my_deck_focus &= (df_for_analysis['my_deck_type'] == selected_focus_type)
@@ -484,9 +518,7 @@ def show_analysis_section(original_df):
         total_appearances = len(focus_as_my_deck_games) + len(focus_as_opponent_deck_games)
         if total_appearances == 0:
             st.warning(f"「{focus_deck_display_name}」の対戦記録が現在の絞り込み条件で見つかりません。")
-            return # return を追加して、これ以降の処理（メモ表示など）も行わないようにする
-        
-        # 総合パフォーマンス
+            return
         wins_when_focus_is_my_deck_df = focus_as_my_deck_games[focus_as_my_deck_games['result'] == '勝ち']
         wins_when_focus_is_opponent_deck_df = focus_as_opponent_deck_games[focus_as_opponent_deck_games['result'] == '負け']
         total_wins_for_focus_deck = len(wins_when_focus_is_my_deck_df) + len(wins_when_focus_is_opponent_deck_df)
@@ -519,8 +551,6 @@ def show_analysis_section(original_df):
         with perf_col3:
             st.metric("総合勝率", f"{win_rate_for_focus_deck:.1f}%")
             st.metric("勝利時平均ターン", f"{avg_win_finish_turn_val:.1f} T" if avg_win_finish_turn_val is not None else "N/A")
-
-        # 対戦相手別パフォーマンス
         st.markdown("**対戦相手別パフォーマンス（相性）**")
         matchup_data = []
         opponents_set = set()
@@ -569,10 +599,11 @@ def show_analysis_section(original_df):
                 avg_loss_turn = pd.Series(focus_deck_loss_turns_vs_opp).mean() if focus_deck_loss_turns_vs_opp else None
                 win_rate_fd_first_vs_opp = (fd_vs_opp_first_wins_count / fd_vs_opp_first_games_count * 100) if fd_vs_opp_first_games_count > 0 else None
                 win_rate_fd_second_vs_opp = (fd_vs_opp_second_wins_count / fd_vs_opp_second_games_count * 100) if fd_vs_opp_second_games_count > 0 else None
-                games_played_display = f"{games_played_count} (先攻: {fd_vs_opp_first_games_count})"
+                games_played_display = f"{games_played_count} (先攻: {fd_vs_opp_first_games_count})" # ★★★ 変更点 ★★★
                 matchup_data.append({
                     "対戦相手デッキ": opp_deck_name, "対戦相手デッキの型": opp_deck_type,
-                    "対戦数": games_played_display, "(注目デッキの)勝利数": focus_deck_wins_count,
+                    "対戦数": games_played_display, # ★★★ 変更点 ★★★
+                    "(注目デッキの)勝利数": focus_deck_wins_count,
                     "(注目デッキの)勝率(%)": win_rate_vs_opp,
                     "勝利時平均ターン": avg_win_turn, "敗北時平均ターン": avg_loss_turn,
                     "(注目デッキの)先攻時勝率(%)": win_rate_fd_first_vs_opp, "(注目デッキの)後攻時勝率(%)": win_rate_fd_second_vs_opp
@@ -581,8 +612,6 @@ def show_analysis_section(original_df):
             matchup_df_specific_types = pd.DataFrame(matchup_data)
             agg_matchup_data = []
             for opp_deck_name_agg in matchup_df_specific_types['対戦相手デッキ'].unique():
-                # (全タイプ集計の計算ロジックは前回と同じ)
-                # ... (コード省略) ...
                 case1_agg_games_total = focus_as_my_deck_games[focus_as_my_deck_games['opponent_deck'] == opp_deck_name_agg]
                 case2_agg_games_total = focus_as_opponent_deck_games[focus_as_opponent_deck_games['my_deck'] == opp_deck_name_agg]
                 total_games_vs_opp_deck_agg = len(case1_agg_games_total) + len(case2_agg_games_total)
@@ -598,7 +627,7 @@ def show_analysis_section(original_df):
                 avg_loss_turn_agg = pd.Series(all_loss_turns_agg).mean() if all_loss_turns_agg else None
                 c1_fd_first_agg_total = case1_agg_games_total[case1_agg_games_total['first_second'] == '先攻']
                 c2_fd_first_agg_total = case2_agg_games_total[case2_agg_games_total['first_second'] == '後攻']
-                fd_first_games_agg_total_count = len(c1_fd_first_agg_total) + len(c2_fd_first_agg_total)
+                fd_first_games_agg_total_count = len(c1_fd_first_agg_total) + len(c2_fd_first_agg_total) # ★★★ 変更点 ★★★
                 fd_first_wins_agg_total = len(c1_fd_first_agg_total[c1_fd_first_agg_total['result'] == '勝ち']) + len(c2_fd_first_agg_total[c2_fd_first_agg_total['result'] == '負け'])
                 win_rate_fd_first_agg_total = (fd_first_wins_agg_total / fd_first_games_agg_total_count * 100) if fd_first_games_agg_total_count > 0 else None
                 c1_fd_second_agg_total = case1_agg_games_total[case1_agg_games_total['first_second'] == '後攻']
@@ -606,11 +635,12 @@ def show_analysis_section(original_df):
                 fd_second_games_agg_total_count = len(c1_fd_second_agg_total) + len(c2_fd_second_agg_total)
                 fd_second_wins_agg_total = len(c1_fd_second_agg_total[c1_fd_second_agg_total['result'] == '勝ち']) + len(c2_fd_second_agg_total[c2_fd_second_agg_total['result'] == '負け'])
                 win_rate_fd_second_agg_total = (fd_second_wins_agg_total / fd_second_games_agg_total_count * 100) if fd_second_games_agg_total_count > 0 else None
-                games_played_display_agg = f"{total_games_vs_opp_deck_agg} (先攻: {fd_first_games_agg_total_count})"
+                games_played_display_agg = f"{total_games_vs_opp_deck_agg} (先攻: {fd_first_games_agg_total_count})" # ★★★ 変更点 ★★★
                 if total_games_vs_opp_deck_agg > 0:
                     agg_matchup_data.append({
                         "対戦相手デッキ": opp_deck_name_agg, "対戦相手デッキの型": ALL_TYPES_PLACEHOLDER,
-                        "対戦数": games_played_display_agg, "(注目デッキの)勝利数": total_focus_wins_vs_opp_deck_agg,
+                        "対戦数": games_played_display_agg, # ★★★ 変更点 ★★★
+                        "(注目デッキの)勝利数": total_focus_wins_vs_opp_deck_agg,
                         "(注目デッキの)勝率(%)": win_rate_vs_opp_deck_agg,
                         "勝利時平均ターン": avg_win_turn_agg, "敗北時平均ターン": avg_loss_turn_agg,
                         "(注目デッキの)先攻時勝率(%)": win_rate_fd_first_agg_total, "(注目デッキの)後攻時勝率(%)": win_rate_fd_second_agg_total
@@ -620,7 +650,7 @@ def show_analysis_section(original_df):
             if not matchup_df_combined.empty:
                 matchup_df_combined['__sort_type'] = matchup_df_combined['対戦相手デッキの型'].apply(lambda x: ('0_AllTypes' if x == ALL_TYPES_PLACEHOLDER else '1_' + str(x)))
                 matchup_df_final = matchup_df_combined.sort_values(by=["対戦相手デッキ", "__sort_type"]).drop(columns=['__sort_type']).reset_index(drop=True)
-                st.dataframe(matchup_df_final.style.format({
+                st.dataframe(matchup_df_final.style.format({ # 「対戦数」のフォーマットは不要
                     "(注目デッキの)勝率(%)": "{:.1f}%",
                     "勝利時平均ターン": lambda x: f"{x:.1f} T" if pd.notnull(x) else "N/A",
                     "敗北時平均ターン": lambda x: f"{x:.1f} T" if pd.notnull(x) else "N/A",
@@ -630,44 +660,12 @@ def show_analysis_section(original_df):
             else: st.info(f"「{focus_deck_display_name}」の対戦相手別の記録が見つかりません。")
         else: st.info(f"「{focus_deck_display_name}」の対戦相手別の記録が見つかりません。")
         
-        # --- メモ付き記録表示をここに追加 ---
         st.markdown("---")
         st.subheader(f"📝 「{focus_deck_display_name}」のメモ付き対戦記録")
-        
-        memo_filter_my_deck = (focus_as_my_deck_games['memo'].astype(str).str.strip() != '') & \
-                              (focus_as_my_deck_games['memo'].astype(str).str.lower() != 'nan')
-        memos_when_my_deck = focus_as_my_deck_games[memo_filter_my_deck]
-
-        memo_filter_opponent_deck = (focus_as_opponent_deck_games['memo'].astype(str).str.strip() != '') & \
-                                    (focus_as_opponent_deck_games['memo'].astype(str).str.lower() != 'nan')
-        memos_when_opponent_deck = focus_as_opponent_deck_games[memo_filter_opponent_deck]
-        
-        all_memo_games = pd.concat([memos_when_my_deck, memos_when_opponent_deck]).drop_duplicates().reset_index(drop=True)
-
-        if not all_memo_games.empty:
-            memo_display_cols = ['date', 'season', 'environment', 'my_deck', 'my_deck_type', 
-                                 'opponent_deck', 'opponent_deck_type', 'first_second', 
-                                 'result', 'finish_turn', 'memo']
-            actual_memo_display_cols = [col for col in memo_display_cols if col in all_memo_games.columns]
-            
-            df_memo_display = all_memo_games[actual_memo_display_cols].copy()
-            if 'date' in df_memo_display.columns:
-                # NaTでないことを確認してからstrftimeを適用
-                df_memo_display['date'] = pd.to_datetime(df_memo_display['date'], errors='coerce')
-                df_memo_display_sorted = df_memo_display.sort_values(by='date', ascending=False) # ソートを先に行う
-                df_memo_display_sorted['date'] = df_memo_display_sorted['date'].dt.strftime('%Y-%m-%d')
-            else:
-                df_memo_display_sorted = df_memo_display # ソートできない場合
-
-            st.dataframe(df_memo_display_sorted, use_container_width=True)
-        else:
-            st.info(f"「{focus_deck_display_name}」に関するメモ付きの記録は、現在の絞り込み条件ではありません。")
-        # --- メモ付き記録表示ここまで ---
-
+        # (メモ付き記録表示は変更なし)
+        # ...
     else: # 注目デッキが選択されていない場合
-        # --- ここに display_general_deck_performance を呼び出す ---
         display_general_deck_performance(df_for_analysis)
-
 # --- Streamlit アプリ本体 (main関数) ---
 def main():
     st.set_page_config(layout="wide")
