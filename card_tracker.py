@@ -383,7 +383,6 @@ def display_general_deck_performance(df_to_analyze):
             "先攻時勝率 (%)", "後攻時勝率 (%)"
         ]
         
-        ascending_general = False if "勝率" in sort_key_general else False # 登場回数も降順が良いか
 
         gen_perf_df_sorted = gen_perf_df.sort_values(
             by=sort_key_general, 
