@@ -288,10 +288,10 @@ def get_all_types_for_archetype(df, deck_name): # 変更なし
 # --- 分析セクション表示関数 (相性表に先攻/後攻勝率追加) ---
 # --- 分析セクション表示関数 (「対戦数」列の表示形式変更) ---
 # --- 新しいデフォルト表示用関数 ---
+# --- 新しいデフォルト表示用関数 (先攻/後攻情報を追加) ---
 def display_general_deck_performance(df_to_analyze):
     st.subheader("全デッキアーキタイプ パフォーマンス概要")
     
-    # 分析対象のDataFrameから、my_deckとopponent_deckに登場する全てのユニークなデッキ名を取得
     all_deck_archetypes = get_all_analyzable_deck_names(df_to_analyze) 
     if not all_deck_archetypes:
         st.info("分析可能なデッキデータが現在の絞り込み条件ではありません。")
@@ -299,92 +299,117 @@ def display_general_deck_performance(df_to_analyze):
 
     general_performance_data = []
     for deck_a_name in all_deck_archetypes:
-        if not deck_a_name: continue # 空のデッキ名はスキップ
+        if not deck_a_name: continue
 
-        # 1. 総合勝率の計算 (deck_a_name が登場した全ゲームでの勝率)
+        # --- デッキAが登場したゲームを抽出 ---
         games_as_my_deck_df = df_to_analyze[df_to_analyze['my_deck'] == deck_a_name]
+        games_as_opponent_deck_df = df_to_analyze[df_to_analyze['opponent_deck'] == deck_a_name]
+
+        # 1. 総合勝率の計算 (変更なし)
         wins_as_my_deck = len(games_as_my_deck_df[games_as_my_deck_df['result'] == '勝ち'])
         count_as_my_deck = len(games_as_my_deck_df)
-
-        games_as_opponent_deck_df = df_to_analyze[df_to_analyze['opponent_deck'] == deck_a_name]
-        wins_as_opponent_deck = len(games_as_opponent_deck_df[games_as_opponent_deck_df['result'] == '負け']) # deck_a の勝ち
+        wins_as_opponent_deck = len(games_as_opponent_deck_df[games_as_opponent_deck_df['result'] == '負け'])
         count_as_opponent_deck = len(games_as_opponent_deck_df)
-
         total_appearances_deck_a = count_as_my_deck + count_as_opponent_deck
         total_wins_deck_a = wins_as_my_deck + wins_as_opponent_deck
         total_losses_deck_a = total_appearances_deck_a - total_wins_deck_a
         simple_overall_win_rate_deck_a = (total_wins_deck_a / total_appearances_deck_a * 100) if total_appearances_deck_a > 0 else 0.0
 
-        # 2. 平均マッチアップ勝率の計算
+        # --- 先攻/後攻時のゲーム数と勝利数を計算 ---
+        # デッキAが先攻だったゲーム
+        deck_a_first_as_my = games_as_my_deck_df[games_as_my_deck_df['first_second'] == '先攻']
+        deck_a_first_as_opp = games_as_opponent_deck_df[games_as_opponent_deck_df['first_second'] == '後攻'] # my_deckが後攻＝deck_aが先攻
+        total_games_deck_a_first = len(deck_a_first_as_my) + len(deck_a_first_as_opp)
+        wins_deck_a_first = len(deck_a_first_as_my[deck_a_first_as_my['result'] == '勝ち']) + \
+                             len(deck_a_first_as_opp[deck_a_first_as_opp['result'] == '負け'])
+        win_rate_deck_a_first = (wins_deck_a_first / total_games_deck_a_first * 100) if total_games_deck_a_first > 0 else None
+
+        # デッキAが後攻だったゲーム
+        deck_a_second_as_my = games_as_my_deck_df[games_as_my_deck_df['first_second'] == '後攻']
+        deck_a_second_as_opp = games_as_opponent_deck_df[games_as_opponent_deck_df['first_second'] == '先攻']
+        total_games_deck_a_second = len(deck_a_second_as_my) + len(deck_a_second_as_opp)
+        wins_deck_a_second = len(deck_a_second_as_my[deck_a_second_as_my['result'] == '勝ち']) + \
+                             len(deck_a_second_as_opp[deck_a_second_as_opp['result'] == '負け'])
+        win_rate_deck_a_second = (wins_deck_a_second / total_games_deck_a_second * 100) if total_games_deck_a_second > 0 else None
+        # --- 計算ここまで ---
+
+        # 2. 平均マッチアップ勝率の計算 (変更なし)
+        # ... (コード省略) ...
         matchup_win_rates_for_deck_a = []
-        # deck_a が関与したゲームを抽出
-        games_involving_deck_a = df_to_analyze[
-            (df_to_analyze['my_deck'] == deck_a_name) | (df_to_analyze['opponent_deck'] == deck_a_name)
-        ]
-        
+        games_involving_deck_a = df_to_analyze[(df_to_analyze['my_deck'] == deck_a_name) | (df_to_analyze['opponent_deck'] == deck_a_name)]
         unique_opponents_faced_by_deck_a = set()
         for _idx, row in games_involving_deck_a.iterrows():
             opponent_for_this_game = None
-            if row['my_deck'] == deck_a_name:
-                opponent_for_this_game = row['opponent_deck']
-            elif row['opponent_deck'] == deck_a_name:
-                opponent_for_this_game = row['my_deck']
-            
-            # 有効な相手デッキ名のみをセットに追加 (自分自身との対戦は除く)
+            if row['my_deck'] == deck_a_name: opponent_for_this_game = row['opponent_deck']
+            elif row['opponent_deck'] == deck_a_name: opponent_for_this_game = row['my_deck']
             if opponent_for_this_game and opponent_for_this_game != deck_a_name and \
                str(opponent_for_this_game).strip() and str(opponent_for_this_game).strip().lower() != 'nan':
                 unique_opponents_faced_by_deck_a.add(opponent_for_this_game)
-        
         if unique_opponents_faced_by_deck_a:
             for opponent_archetype_name in unique_opponents_faced_by_deck_a:
-                # deck_a vs opponent_archetype_name の戦績
-                # (型は考慮せず、アーキタイプ名のみで集計)
-                
-                # ケース1: deck_a が my_deck, opponent_archetype_name が opponent_deck
-                a_vs_opp_my_games = games_involving_deck_a[
-                    (games_involving_deck_a['my_deck'] == deck_a_name) & 
-                    (games_involving_deck_a['opponent_deck'] == opponent_archetype_name)
-                ]
+                a_vs_opp_my_games = games_involving_deck_a[(games_involving_deck_a['my_deck'] == deck_a_name) & (games_involving_deck_a['opponent_deck'] == opponent_archetype_name)]
                 a_vs_opp_my_wins = len(a_vs_opp_my_games[a_vs_opp_my_games['result'] == '勝ち'])
-                
-                # ケース2: deck_a が opponent_deck, opponent_archetype_name が my_deck
-                a_vs_opp_opponent_games = games_involving_deck_a[
-                    (games_involving_deck_a['opponent_deck'] == deck_a_name) & 
-                    (games_involving_deck_a['my_deck'] == opponent_archetype_name)
-                ]
-                a_vs_opp_opponent_wins = len(a_vs_opp_opponent_games[a_vs_opp_opponent_games['result'] == '負け']) # deck_aの勝ち
-
+                a_vs_opp_opponent_games = games_involving_deck_a[(games_involving_deck_a['opponent_deck'] == deck_a_name) & (games_involving_deck_a['my_deck'] == opponent_archetype_name)]
+                a_vs_opp_opponent_wins = len(a_vs_opp_opponent_games[a_vs_opp_opponent_games['result'] == '負け'])
                 total_games_vs_specific_opponent = len(a_vs_opp_my_games) + len(a_vs_opp_opponent_games)
                 total_wins_for_a_vs_specific_opponent = a_vs_opp_my_wins + a_vs_opp_opponent_wins
-
                 if total_games_vs_specific_opponent > 0:
                     wr = (total_wins_for_a_vs_specific_opponent / total_games_vs_specific_opponent * 100)
                     matchup_win_rates_for_deck_a.append(wr)
-        
         avg_matchup_wr_deck_a = pd.Series(matchup_win_rates_for_deck_a).mean() if matchup_win_rates_for_deck_a else None
 
-        if total_appearances_deck_a > 0: # 登場回数があるデッキのみ表示
+
+        if total_appearances_deck_a > 0:
+            # 「総登場回数」の表示形式を変更
+            appearance_display = f"{total_appearances_deck_a} (先攻: {total_games_deck_a_first})"
+            
             general_performance_data.append({
                 "デッキアーキタイプ": deck_a_name,
-                "総登場回数": total_appearances_deck_a,
+                "総登場回数": appearance_display, # ★★★ 変更点 ★★★
                 "総勝利数": total_wins_deck_a,
                 "総敗北数": total_losses_deck_a,
                 "勝率 (%) [総合]": simple_overall_win_rate_deck_a,
                 "平均マッチアップ勝率 (%)": avg_matchup_wr_deck_a,
+                "先攻時勝率 (%)": win_rate_deck_a_first, # ★★★ 追加 ★★★
+                "後攻時勝率 (%)": win_rate_deck_a_second, # ★★★ 追加 ★★★
             })
 
     if general_performance_data:
         gen_perf_df = pd.DataFrame(general_performance_data)
-        # 平均マッチアップ勝率でソート、NaNは最後に (または総合勝率でソートも可)
-        gen_perf_df_sorted = gen_perf_df.sort_values(by="平均マッチアップ勝率 (%)", ascending=False, na_position='last').reset_index(drop=True)
+        # 表示する列の順序を調整
+        display_cols_general = [
+            "デッキアーキタイプ", "総登場回数", "総勝利数", "総敗北数", 
+            "勝率 (%) [総合]", "平均マッチアップ勝率 (%)", 
+            "先攻時勝率 (%)", "後攻時勝率 (%)"
+        ]
+        # ソートキーを選択できるようにしても良い (例: 平均マッチアップ勝率)
+        sort_key_general = st.selectbox(
+            "概要パフォーマンス表のソート基準:",
+            options=["平均マッチアップ勝率 (%)", "勝率 (%) [総合]", "総登場回数"],
+            key="sort_general_perf",
+            index=0 # デフォルトは平均マッチアップ勝率
+        )
+        ascending_general = False if "勝率" in sort_key_general else False # 登場回数も降順が良いか
+
+        gen_perf_df_sorted = gen_perf_df.sort_values(
+            by=sort_key_general, 
+            ascending=ascending_general, 
+            na_position='last'
+        ).reset_index(drop=True)
         
-        st.dataframe(gen_perf_df_sorted.style.format({
+        st.dataframe(gen_perf_df_sorted[display_cols_general].style.format({ # 表示列を限定
             "勝率 (%) [総合]": "{:.1f}%",
             "平均マッチアップ勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A",
+            "先攻時勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A", # ★★★ 追加 ★★★
+            "後攻時勝率 (%)": lambda x: f"{x:.1f}%" if pd.notnull(x) else "N/A", # ★★★ 追加 ★★★
         }), use_container_width=True)
     else:
         st.info("表示するデッキパフォーマンスデータがありません。")
 
+# --- 分析セクション表示関数 (show_analysis_section) の変更点 ---
+# display_general_deck_performance を呼び出す部分は変更なし
+# 注目デッキが選択された場合の詳細分析部分は変更なし
+# (show_analysis_section 全体は長いため、display_general_deck_performance の変更のみ上記に記載)
 
 # --- 分析セクション表示関数 (注目デッキ分析 + デフォルト表示の切り分け) ---
 # --- 分析セクション表示関数 (「対戦数」列の表示形式変更) ---
