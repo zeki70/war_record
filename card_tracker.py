@@ -382,13 +382,7 @@ def display_general_deck_performance(df_to_analyze):
             "勝率 (%) [総合]", "平均マッチアップ勝率 (%)", 
             "先攻時勝率 (%)", "後攻時勝率 (%)"
         ]
-        # ソートキーを選択できるようにしても良い (例: 平均マッチアップ勝率)
-        sort_key_general = st.selectbox(
-            "概要パフォーマンス表のソート基準:",
-            options=["平均マッチアップ勝率 (%)", "勝率 (%) [総合]", "総登場回数"],
-            key="sort_general_perf",
-            index=0 # デフォルトは平均マッチアップ勝率
-        )
+        
         ascending_general = False if "勝率" in sort_key_general else False # 登場回数も降順が良いか
 
         gen_perf_df_sorted = gen_perf_df.sort_values(
