@@ -669,14 +669,13 @@ def show_analysis_section(original_df):
         display_general_deck_performance(df_for_analysis)
 
 # --- Streamlit アプリ本体 (main関数) ---
-# --- Streamlit アプリ本体 (main関数) ---
 def main():
     st.set_page_config(layout="wide")
     st.title("カードゲーム戦績管理アプリ (" + SPREADSHEET_NAME_DISPLAY + ")")
 
     # (SPREADSHEET_IDのチェック、パスワード認証、df = load_data(...) の部分は変更なし)
     # ... (コード省略) ...
-    if SPREADSHEET_ID == "ここに実際の Waic-戦績 のスプレッドシートIDを貼り付け": # 初期値のままならエラー表示
+    if SPREADSHEET_ID == "ここに実際の Waic-戦績 のスプレッドシートIDを貼り付け":
         st.error("コード内の SPREADSHEET_ID を、お使いのGoogleスプレッドシートの実際のIDに置き換えてください。")
         st.warning("スプレッドシートIDは、スプレッドシートのURLに含まれる長い英数字の文字列です。")
         st.code("https://docs.google.com/spreadsheets/d/【この部分がIDです】/edit")
@@ -702,10 +701,9 @@ def main():
 
     df = load_data(SPREADSHEET_ID, WORKSHEET_NAME)
 
-
     with st.expander("戦績を入力する", expanded=True):
-        # (入力フォームのウィジェット定義部分は変更なしなので省略します)
-        # ... (シーズン入力からメモ入力までのコード) ...
+        # (入力フォームのコードは変更なしなので省略します)
+        # ...
         st.subheader("対戦情報")
         season_options = get_unique_items_with_new_option(df, 'season')
         st.selectbox("シーズン *", season_options, key='inp_season_select', help="例: 2025年前期, 〇〇カップ")
@@ -728,9 +726,9 @@ def main():
             if not valid_items.empty: unique_past_environments = sorted(valid_items.unique().tolist())
         current_environments = list(set(predefined_environments + unique_past_environments))
         environment_options = [NEW_ENTRY_LABEL] + sorted([opt for opt in current_environments if opt and opt != NEW_ENTRY_LABEL])
-        st.selectbox("対戦環境 *", environment_options, key='inp_environment_select') # 「*」を追加して必須項目であることを示唆
+        st.selectbox("対戦環境 *", environment_options, key='inp_environment_select') # 必須項目に戻す
         if st.session_state.get('inp_environment_select') == NEW_ENTRY_LABEL:
-            st.text_input("新しい対戦環境を入力 *", value=st.session_state.get('inp_environment_new', ""), key='inp_environment_new') # 「*」を追加
+            st.text_input("新しい対戦環境を入力 *", value=st.session_state.get('inp_environment_new', ""), key='inp_environment_new') # 必須項目に戻す
 
         deck_name_options = get_combined_unique_items_with_new_option(df, ['my_deck', 'opponent_deck'])
         col1, col2 = st.columns(2)
@@ -776,22 +774,15 @@ def main():
             final_opponent_deck = st.session_state.get('inp_opponent_deck_new', '') if st.session_state.get('inp_opponent_deck') == NEW_ENTRY_LABEL else st.session_state.get('inp_opponent_deck')
             final_opponent_deck_type = st.session_state.get('inp_opponent_deck_type_new', '') if st.session_state.get('inp_opponent_deck_type') == NEW_ENTRY_LABEL else st.session_state.get('inp_opponent_deck_type')
             
-            # --- 対戦環境の値を取得し、バリデーション用に元の選択状態も保持 ---
             selected_environment_option = st.session_state.get('inp_environment_select')
             final_environment = st.session_state.get('inp_environment_new', '') if selected_environment_option == NEW_ENTRY_LABEL else selected_environment_option
-            # NEW_ENTRY_LABEL のまま（かつ新規入力も空）の場合をバリデーションでチェックするために、
-            # final_environment が NEW_ENTRY_LABEL かどうか、または空文字かどうかで判定
-            # 修正: final_environmentがNEW_ENTRY_LABELのまま、かつinp_environment_newも空の場合をエラーとする
             
             date_val_from_state = st.session_state.get('inp_date')
-            # (日付処理は変更なし)
-            # ...
             if isinstance(date_val_from_state, datetime): date_val = date_val_from_state.date()
             elif isinstance(date_val_from_state, type(datetime.today().date())): date_val = date_val_from_state
             else: 
                 try: date_val = pd.to_datetime(date_val_from_state).date()
                 except: date_val = datetime.today().date()
-
             first_second_val = st.session_state.get('inp_first_second')
             result_val = st.session_state.get('inp_result')
             finish_turn_val = st.session_state.get('inp_finish_turn')
@@ -804,14 +795,13 @@ def main():
             if not final_opponent_deck or final_opponent_deck == NEW_ENTRY_LABEL: error_messages.append("相手デッキ名を入力または選択してください。")
             if not final_opponent_deck_type or final_opponent_deck_type == NEW_ENTRY_LABEL: error_messages.append("相手デッキの型を入力または選択してください。")
             if finish_turn_val is None: error_messages.append("決着ターンを入力してください。")
-
-            # --- 「対戦環境」の必須入力チェック ---
-            is_env_new_input_empty = (st.session_state.get('inp_environment_new', '').strip() == "")
-            if selected_environment_option == NEW_ENTRY_LABEL and is_env_new_input_empty:
+            
+            # 対戦環境の必須入力チェック
+            is_env_new_input_empty_for_validation = (st.session_state.get('inp_environment_new', '').strip() == "")
+            if selected_environment_option == NEW_ENTRY_LABEL and is_env_new_input_empty_for_validation:
                  error_messages.append("対戦環境で「新しい値を入力」を選択した場合は、内容を入力してください。")
-            elif not final_environment or final_environment == NEW_ENTRY_LABEL: # NEW_ENTRY_LABELのまま or 選択なし(実質空)
+            elif not final_environment or final_environment == NEW_ENTRY_LABEL:
                  error_messages.append("対戦環境を選択または入力してください。")
-            # --- チェックここまで ---
 
 
             if error_messages:
@@ -819,8 +809,8 @@ def main():
                 success_placeholder.empty()
             else:
                 error_placeholder.empty()
-                # final_environmentがNEW_ENTRY_LABELのままなら空文字にする処理はここで再度確認
-                if final_environment == NEW_ENTRY_LABEL : final_environment = '' # 通常は上のバリデーションで弾かれるはず
+                # final_environment が NEW_ENTRY_LABEL のままなら空文字にする
+                if final_environment == NEW_ENTRY_LABEL : final_environment = '' 
 
                 new_record_data = {
                     'season': final_season, 'date': pd.to_datetime(date_val),
@@ -832,55 +822,96 @@ def main():
                     'memo': memo_val
                 }
                 new_df_row = pd.DataFrame([new_record_data], columns=COLUMNS)
-                
                 if save_data(new_df_row, SPREADSHEET_ID, WORKSHEET_NAME):
                     success_placeholder.success("戦績を記録しました！")
-                    # リセット処理 (対戦環境もリセット対象に含めるか、要望に応じて調整)
                     keys_to_delete_after_submit = [
                         'inp_date', 'inp_first_second', 'inp_result', 
-                        'inp_finish_turn', 'inp_memo',
-                        'inp_environment_select', 'inp_environment_new' # 対戦環境もリセット
+                        'inp_finish_turn', 'inp_memo'
+                        # 'inp_environment_select', 'inp_environment_new' # 対戦環境は保持する設定
                     ]
-                    # シーズン、デッキ名、型は保持
                     for key in keys_to_delete_after_submit:
                         if key in st.session_state: del st.session_state[key]
                     
-                    # 新規入力用のテキストフィールドもクリア (select が NEW_ENTRY_LABEL だった場合の後始末)
-                    # (これは keys_to_delete_after_submit で対応済みのはず)
+                    # 新規入力用のテキストフィールドもクリア (対応するselectboxがNEW_ENTRY_LABELでない場合は保持される)
+                    # selectboxがリセットされない限り、新規入力フィールドも保持されるのが自然かもしれないので、一旦コメントアウト
                     # new_keys_to_clear = ['inp_season_new', 'inp_my_deck_new', 'inp_my_deck_type_new', 
                     #                      'inp_opponent_deck_new', 'inp_opponent_deck_type_new', 'inp_environment_new']
                     # for key in new_keys_to_clear:
-                    #     if key in st.session_state: st.session_state[key] = ""
+                    #     if key in st.session_state and st.session_state.get(key.replace("_new", "_select")) == NEW_ENTRY_LABEL:
+                    #         st.session_state[key] = ""
                     st.rerun()
                 else:
                     error_placeholder.error("データの保存に失敗しました。Google Sheetsへの接続を確認してください。")
 
-    # (show_analysis_section と 戦績一覧表示は変更なしなので省略)
-    # ...
+    # --- 分析セクションを呼び出す ---
     show_analysis_section(df.copy())
+
+    # --- 戦績一覧表示 (一番下に表示) ---
     st.header("戦績一覧")
-    if df.empty:
-        st.info("まだ戦績データがありません。")
+    
+    # --- ここから戦績一覧のフィルタリングロジック ---
+    df_for_list_display = df.copy() 
+
+    focus_deck_for_list = st.session_state.get('ana_focus_deck_name_selector') # 分析セクションの注目デッキキー
+    focus_type_for_list = st.session_state.get('ana_focus_deck_type_selector') # 分析セクションの注目デッキ型キー
+
+    list_filter_active = False
+    if focus_deck_for_list and focus_deck_for_list != SELECT_PLACEHOLDER:
+        list_filter_active = True
+        # 注目デッキが選択されている場合、一覧をフィルタリング
+        cond_my_deck = (df_for_list_display['my_deck'] == focus_deck_for_list)
+        if focus_type_for_list and focus_type_for_list != ALL_TYPES_PLACEHOLDER:
+            cond_my_deck &= (df_for_list_display['my_deck_type'] == focus_type_for_list)
+        
+        cond_opponent_deck = (df_for_list_display['opponent_deck'] == focus_deck_for_list)
+        if focus_type_for_list and focus_type_for_list != ALL_TYPES_PLACEHOLDER:
+            cond_opponent_deck &= (df_for_list_display['opponent_deck_type'] == focus_type_for_list)
+            
+        df_for_list_display = df_for_list_display[cond_my_deck | cond_opponent_deck]
+    # --- フィルタリングロジックここまで ---
+
+    if df_for_list_display.empty:
+        if list_filter_active: # フィルタによって空になった場合
+            st.info(f"注目デッキ「{focus_deck_for_list}」に関する戦績記録は、現在の絞り込み条件では見つかりませんでした。")
+        elif df.empty: # 元のデータが空の場合
+            st.info("まだ戦績データがありません。")
+        else: # フィルタはかかっていないが、何らかの理由でdf_for_list_displayが空（通常は起こらないはず）
+             st.info("表示できる戦績データがありません。")
     else:
-        display_columns = ['date', 'season', 'environment', 'my_deck', 'my_deck_type', 'opponent_deck', 'opponent_deck_type', 'first_second', 'result', 'finish_turn', 'memo']
-        cols_to_display_actual = [col for col in display_columns if col in df.columns]
-        df_display = df.copy()
-        if 'date' in df_display.columns:
-            df_display['date'] = pd.to_datetime(df_display['date'], errors='coerce')
-            not_nat_dates = df_display.dropna(subset=['date'])
-            nat_dates = df_display[df_display['date'].isna()]
+        display_columns = ['date', 'season', 'environment', 'my_deck', 'my_deck_type', 
+                           'opponent_deck', 'opponent_deck_type', 'first_second', 
+                           'result', 'finish_turn', 'memo']
+        cols_to_display_actual = [col for col in display_columns if col in df_for_list_display.columns]
+        
+        df_display_final = df_for_list_display.copy() # フィルタ後のDataFrameを使用
+        if 'date' in df_display_final.columns:
+            df_display_final['date'] = pd.to_datetime(df_display_final['date'], errors='coerce')
+            # NaTでない行のみソートし、NaT行を末尾に結合
+            not_nat_dates = df_display_final.dropna(subset=['date'])
+            nat_dates = df_display_final[df_display_final['date'].isna()]
             df_display_sorted = pd.concat([not_nat_dates.sort_values(by='date', ascending=False), nat_dates]).reset_index(drop=True)
+
             if pd.api.types.is_datetime64_any_dtype(df_display_sorted['date']):
                  df_display_sorted['date'] = df_display_sorted['date'].apply(
                      lambda x: x.strftime('%Y-%m-%d') if pd.notnull(x) else None)
         else:
-            df_display_sorted = df_display.reset_index(drop=True)
-        st.dataframe(df_display_sorted[cols_to_display_actual])
+            df_display_sorted = df_display_final.reset_index(drop=True) # 日付列がない場合
+            
+        st.dataframe(df_display_sorted[cols_to_display_actual]) # 表示するのは絞り込まれたデータ
+        
+        # CSVダウンロードは元データ(df)か絞り込み後データ(df_for_list_display)か選択できるようにしても良い
+        # ここでは元データ(df)をダウンロードするようにしておく
         csv_export = df.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
-            label="戦績データをCSVでダウンロード", data=csv_export,
-            file_name='game_records_download.csv', mime='text/csv',
+            label="戦績データをCSVでダウンロード (全件)", data=csv_export,
+            file_name='game_records_all_download.csv', mime='text/csv',
         )
+        if list_filter_active: # フィルタリングされている場合は、フィルタ結果もダウンロードできるようにする
+            csv_export_filtered = df_for_list_display.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label=f"戦績データをCSVでダウンロード (「{focus_deck_for_list}」関連のみ)", data=csv_export_filtered,
+                file_name=f'game_records_focus_{focus_deck_for_list}.csv', mime='text/csv',
+            )
 
 
 if __name__ == '__main__':
