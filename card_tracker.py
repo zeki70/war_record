@@ -825,7 +825,8 @@ def main():
                 if save_data(new_df_row, SPREADSHEET_ID, WORKSHEET_NAME):
                     success_placeholder.success("戦績を記録しました！")
                     keys_to_delete_after_submit = [
-                        'inp_date', 'inp_first_second', 'inp_result', 
+                        #'inp_date', 
+                        'inp_first_second', 'inp_result', 
                         'inp_finish_turn', 'inp_memo'
                         # 'inp_environment_select', 'inp_environment_new' # 対戦環境は保持する設定
                     ]
