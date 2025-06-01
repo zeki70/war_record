@@ -657,44 +657,48 @@ def show_analysis_section(original_df):
 # (main関数や他のヘルパー関数は前回から変更ありませんので、ここでは省略します)
 
 # --- Streamlit アプリ本体 (main関数) ---
+# --- Streamlit アプリ本体 (main関数) ---
 def main():
     st.set_page_config(layout="wide")
-    # --- パスワード認証 ---
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False # 初期状態は未認証
+    st.title("カードゲーム戦績管理アプリ (" + SPREADSHEET_NAME_DISPLAY + ")")
 
+    # (SPREADSHEET_IDのチェック、パスワード認証、df = load_data(...) の部分は変更なし)
+    # ... (コード省略) ...
+    if SPREADSHEET_ID == "ここに実際の Waic-戦績 のスプレッドシートIDを貼り付け": # 初期値のままならエラー表示
+        st.error("コード内の SPREADSHEET_ID を、お使いのGoogleスプレッドシートの実際のIDに置き換えてください。")
+        st.warning("スプレッドシートIDは、スプレッドシートのURLに含まれる長い英数字の文字列です。")
+        st.code("https://docs.google.com/spreadsheets/d/【この部分がIDです】/edit")
+        st.stop()
+    
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
     if not st.session_state.authenticated:
         st.title("アプリへのログイン")
-        password_placeholder = st.empty()
-        password_input = password_placeholder.text_input("パスワードを入力してください:", type="password", key="password_input_field")
-        
-        if st.button("ログイン", key="login_button"):
-            if password_input == CORRECT_PASSWORD:
-                st.session_state.authenticated = True
-                password_placeholder.empty() # 入力フィールドを消す
-                st.rerun() # 認証成功後にページを再読み込みしてコンテンツ表示
-            else:
-                st.error("パスワードが正しくありません。")
-        st.stop() # 未認証の場合はここで処理を停止し、以下のメインコンテンツを表示しない
-
-    st.title("Waic戦績管理アプリ")
-
-    # ★★★ SPREADSHEET_ID をご自身のIDに置き換えてください ★★★
-    # SPREADSHEET_ID = "ここに実際の Waic-戦績 のスプレッドシートIDを貼り付け" 
-    # if SPREADSHEET_ID == "ここに実際の Waic-戦績 のスプレッドシートIDを貼り付け":
-    #     st.error("コード内の SPREADSHEET_ID を、お使いのGoogleスプレッドシートの実際のIDに置き換えてください。")
-    #     st.stop()
+        login_col1, login_col2, login_col3 = st.columns([1,1,1])
+        with login_col2:
+            with st.form("login_form_main"):
+                st.markdown("#### パスワードを入力してください")
+                password_input = st.text_input("パスワード", type="password", key="password_input_field_main", label_visibility="collapsed")
+                login_button = st.form_submit_button("ログイン")
+                if login_button:
+                    if password_input == CORRECT_PASSWORD:
+                        st.session_state.authenticated = True
+                        st.rerun() 
+                    else:
+                        st.error("パスワードが正しくありません。")
+        st.stop()
 
     df = load_data(SPREADSHEET_ID, WORKSHEET_NAME)
 
+
     with st.expander("戦績を入力する", expanded=True):
-        # ... (入力フォームのコードは変更なし) ...
+        # (入力フォームのウィジェット定義部分は変更なしなので省略します)
+        # ... (シーズン入力からメモ入力までのコード) ...
         st.subheader("対戦情報")
         season_options = get_unique_items_with_new_option(df, 'season')
         st.selectbox("シーズン *", season_options, key='inp_season_select', help="例: 2025年前期, 〇〇カップ")
         if st.session_state.get('inp_season_select') == NEW_ENTRY_LABEL:
             st.text_input("新しいシーズン名を入力 *", value=st.session_state.get('inp_season_new', ""), key='inp_season_new')
-        
         default_dt_for_input = datetime.today().date()
         if 'inp_date' in st.session_state and st.session_state.inp_date is not None:
             if isinstance(st.session_state.inp_date, datetime):
@@ -705,17 +709,16 @@ def main():
                 try: default_dt_for_input = pd.to_datetime(st.session_state.inp_date).date()
                 except: pass
         st.date_input("対戦日", value=default_dt_for_input, key='inp_date')
-        
         predefined_environments = ["Waic内", "野良", "大会"]
         unique_past_environments = []
         if 'environment' in df.columns and not df.empty and not df['environment'].dropna().empty:
             valid_items = df['environment'].astype(str).replace('', pd.NA).dropna()
             if not valid_items.empty: unique_past_environments = sorted(valid_items.unique().tolist())
-        combined_env_options = sorted(list(set(predefined_environments + unique_past_environments)))
-        environment_options = [NEW_ENTRY_LABEL] + [opt for opt in combined_env_options if opt and opt != NEW_ENTRY_LABEL]
-        st.selectbox("対戦環境", environment_options, key='inp_environment_select')
+        current_environments = list(set(predefined_environments + unique_past_environments))
+        environment_options = [NEW_ENTRY_LABEL] + sorted([opt for opt in current_environments if opt and opt != NEW_ENTRY_LABEL])
+        st.selectbox("対戦環境 *", environment_options, key='inp_environment_select') # 「*」を追加して必須項目であることを示唆
         if st.session_state.get('inp_environment_select') == NEW_ENTRY_LABEL:
-            st.text_input("新しい対戦環境を入力", value=st.session_state.get('inp_environment_new', ""), key='inp_environment_new')
+            st.text_input("新しい対戦環境を入力 *", value=st.session_state.get('inp_environment_new', ""), key='inp_environment_new') # 「*」を追加
 
         deck_name_options = get_combined_unique_items_with_new_option(df, ['my_deck', 'opponent_deck'])
         col1, col2 = st.columns(2)
@@ -726,9 +729,9 @@ def main():
                 st.text_input("新しい使用デッキ名を入力 *", value=st.session_state.get('inp_my_deck_new', ""), key='inp_my_deck_new')
             my_deck_name_for_type_options = st.session_state.get('inp_my_deck', NEW_ENTRY_LABEL)
             my_deck_type_options = get_types_for_deck(df, my_deck_name_for_type_options)
-            st.selectbox("使用デッキのチューニング(特になかったらテンプレで) *", my_deck_type_options, key='inp_my_deck_type')
+            st.selectbox("使用デッキの型 *", my_deck_type_options, key='inp_my_deck_type')
             if st.session_state.get('inp_my_deck_type') == NEW_ENTRY_LABEL:
-                st.text_input("新しい使用デッキのチューニング(特になかったらテンプレで)を入力 *", value=st.session_state.get('inp_my_deck_type_new', ""), key='inp_my_deck_type_new')
+                st.text_input("新しい使用デッキの型を入力 *", value=st.session_state.get('inp_my_deck_type_new', ""), key='inp_my_deck_type_new')
         with col2:
             st.subheader("対戦相手のデッキ")
             st.selectbox("相手デッキ *", deck_name_options, key='inp_opponent_deck')
@@ -736,9 +739,9 @@ def main():
                 st.text_input("新しい相手デッキ名を入力 *", value=st.session_state.get('inp_opponent_deck_new', ""), key='inp_opponent_deck_new')
             opponent_deck_name_for_type_options = st.session_state.get('inp_opponent_deck', NEW_ENTRY_LABEL)
             opponent_deck_type_options = get_types_for_deck(df, opponent_deck_name_for_type_options)
-            st.selectbox("相手デッキのチューニング(特になかったらテンプレで) *", opponent_deck_type_options, key='inp_opponent_deck_type')
+            st.selectbox("相手デッキの型 *", opponent_deck_type_options, key='inp_opponent_deck_type')
             if st.session_state.get('inp_opponent_deck_type') == NEW_ENTRY_LABEL:
-                st.text_input("新しい相手デッキのチューニング(特になかったらテンプレで)を入力 *", value=st.session_state.get('inp_opponent_deck_type_new', ""), key='inp_opponent_deck_type_new')
+                st.text_input("新しい相手デッキの型を入力 *", value=st.session_state.get('inp_opponent_deck_type_new', ""), key='inp_opponent_deck_type_new')
         
         st.subheader("対戦結果")
         res_col1, res_col2, res_col3 = st.columns(3)
@@ -755,17 +758,22 @@ def main():
         success_placeholder = st.empty()
 
         if st.button("戦績を記録", key='submit_record_button'):
-            # ... (記録処理のコードは変更なし) ...
             final_season = st.session_state.get('inp_season_new', '') if st.session_state.get('inp_season_select') == NEW_ENTRY_LABEL else st.session_state.get('inp_season_select')
             final_my_deck = st.session_state.get('inp_my_deck_new', '') if st.session_state.get('inp_my_deck') == NEW_ENTRY_LABEL else st.session_state.get('inp_my_deck')
-            # ... (他の final_... 変数の取得も同様) ...
             final_my_deck_type = st.session_state.get('inp_my_deck_type_new', '') if st.session_state.get('inp_my_deck_type') == NEW_ENTRY_LABEL else st.session_state.get('inp_my_deck_type')
             final_opponent_deck = st.session_state.get('inp_opponent_deck_new', '') if st.session_state.get('inp_opponent_deck') == NEW_ENTRY_LABEL else st.session_state.get('inp_opponent_deck')
             final_opponent_deck_type = st.session_state.get('inp_opponent_deck_type_new', '') if st.session_state.get('inp_opponent_deck_type') == NEW_ENTRY_LABEL else st.session_state.get('inp_opponent_deck_type')
-            final_environment = st.session_state.get('inp_environment_new', '') if st.session_state.get('inp_environment_select') == NEW_ENTRY_LABEL else st.session_state.get('inp_environment_select')
-            if final_environment == NEW_ENTRY_LABEL : final_environment = ''
+            
+            # --- 対戦環境の値を取得し、バリデーション用に元の選択状態も保持 ---
+            selected_environment_option = st.session_state.get('inp_environment_select')
+            final_environment = st.session_state.get('inp_environment_new', '') if selected_environment_option == NEW_ENTRY_LABEL else selected_environment_option
+            # NEW_ENTRY_LABEL のまま（かつ新規入力も空）の場合をバリデーションでチェックするために、
+            # final_environment が NEW_ENTRY_LABEL かどうか、または空文字かどうかで判定
+            # 修正: final_environmentがNEW_ENTRY_LABELのまま、かつinp_environment_newも空の場合をエラーとする
             
             date_val_from_state = st.session_state.get('inp_date')
+            # (日付処理は変更なし)
+            # ...
             if isinstance(date_val_from_state, datetime): date_val = date_val_from_state.date()
             elif isinstance(date_val_from_state, type(datetime.today().date())): date_val = date_val_from_state
             else: 
@@ -779,12 +787,19 @@ def main():
             
             error_messages = []
             if not final_season or final_season == NEW_ENTRY_LABEL: error_messages.append("シーズンを入力または選択してください。")
-            # ... (他のバリデーションも同様) ...
             if not final_my_deck or final_my_deck == NEW_ENTRY_LABEL: error_messages.append("使用デッキ名を入力または選択してください。")
-            if not final_my_deck_type or final_my_deck_type == NEW_ENTRY_LABEL: error_messages.append("使用デッキのチューニング(特になかったらテンプレで)を入力または選択してください。")
+            if not final_my_deck_type or final_my_deck_type == NEW_ENTRY_LABEL: error_messages.append("使用デッキの型を入力または選択してください。")
             if not final_opponent_deck or final_opponent_deck == NEW_ENTRY_LABEL: error_messages.append("相手デッキ名を入力または選択してください。")
-            if not final_opponent_deck_type or final_opponent_deck_type == NEW_ENTRY_LABEL: error_messages.append("相手デッキのチューニング(特になかったらテンプレで)を入力または選択してください。")
+            if not final_opponent_deck_type or final_opponent_deck_type == NEW_ENTRY_LABEL: error_messages.append("相手デッキの型を入力または選択してください。")
             if finish_turn_val is None: error_messages.append("決着ターンを入力してください。")
+
+            # --- 「対戦環境」の必須入力チェック ---
+            is_env_new_input_empty = (st.session_state.get('inp_environment_new', '').strip() == "")
+            if selected_environment_option == NEW_ENTRY_LABEL and is_env_new_input_empty:
+                 error_messages.append("対戦環境で「新しい値を入力」を選択した場合は、内容を入力してください。")
+            elif not final_environment or final_environment == NEW_ENTRY_LABEL: # NEW_ENTRY_LABELのまま or 選択なし(実質空)
+                 error_messages.append("対戦環境を選択または入力してください。")
+            # --- チェックここまで ---
 
 
             if error_messages:
@@ -792,6 +807,9 @@ def main():
                 success_placeholder.empty()
             else:
                 error_placeholder.empty()
+                # final_environmentがNEW_ENTRY_LABELのままなら空文字にする処理はここで再度確認
+                if final_environment == NEW_ENTRY_LABEL : final_environment = '' # 通常は上のバリデーションで弾かれるはず
+
                 new_record_data = {
                     'season': final_season, 'date': pd.to_datetime(date_val),
                     'environment': final_environment, 
@@ -805,23 +823,33 @@ def main():
                 
                 if save_data(new_df_row, SPREADSHEET_ID, WORKSHEET_NAME):
                     success_placeholder.success("戦績を記録しました！")
+                    # リセット処理 (対戦環境もリセット対象に含めるか、要望に応じて調整)
                     keys_to_delete_after_submit = [
                         'inp_date', 'inp_first_second', 'inp_result', 
-                        'inp_finish_turn', 'inp_memo'
+                        'inp_finish_turn', 'inp_memo',
+                        'inp_environment_select', 'inp_environment_new' # 対戦環境もリセット
                     ]
+                    # シーズン、デッキ名、型は保持
                     for key in keys_to_delete_after_submit:
-                        if key in st.session_state:
-                            del st.session_state[key]
+                        if key in st.session_state: del st.session_state[key]
+                    
+                    # 新規入力用のテキストフィールドもクリア (select が NEW_ENTRY_LABEL だった場合の後始末)
+                    # (これは keys_to_delete_after_submit で対応済みのはず)
+                    # new_keys_to_clear = ['inp_season_new', 'inp_my_deck_new', 'inp_my_deck_type_new', 
+                    #                      'inp_opponent_deck_new', 'inp_opponent_deck_type_new', 'inp_environment_new']
+                    # for key in new_keys_to_clear:
+                    #     if key in st.session_state: st.session_state[key] = ""
                     st.rerun()
                 else:
                     error_placeholder.error("データの保存に失敗しました。Google Sheetsへの接続を確認してください。")
 
+    # (show_analysis_section と 戦績一覧表示は変更なしなので省略)
+    # ...
     show_analysis_section(df.copy())
     st.header("戦績一覧")
     if df.empty:
         st.info("まだ戦績データがありません。")
     else:
-        # ... (戦績一覧表示のコードは変更なし) ...
         display_columns = ['date', 'season', 'environment', 'my_deck', 'my_deck_type', 'opponent_deck', 'opponent_deck_type', 'first_second', 'result', 'finish_turn', 'memo']
         cols_to_display_actual = [col for col in display_columns if col in df.columns]
         df_display = df.copy()
@@ -841,6 +869,7 @@ def main():
             label="戦績データをCSVでダウンロード", data=csv_export,
             file_name='game_records_download.csv', mime='text/csv',
         )
+
 
 if __name__ == '__main__':
     main()
