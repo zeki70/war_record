@@ -6,16 +6,16 @@ import gspread
 from google.oauth2.service_account import Credentials
 from gspread_dataframe import get_as_dataframe
 from streamlit.errors import StreamlitAPIException
+from streamlit_cookies_manager import EncryptedCookieManager
+
+st.set_page_config(layout="wide")
 
 # --- 定数定義 ---
 SPREADSHEET_NAME_DISPLAY = "Waic-戦績"
 SPREADSHEET_ID = "1V9guZQbpV8UDU_W2pC1WBsE1hOHqIO4yTsG8oGzaPQU" # ユーザー提供のID。実際のIDに置き換えてください。
 WORKSHEET_NAME = "シート1"
-COLUMNS = [
-    'season', 'date', 'environment', 'my_deck', 'my_deck_type',
-    'opponent_deck', 'opponent_deck_type', 'first_second',
-    'result', 'finish_turn', 'memo'
-]
+COLUMNS = [ 'season', 'date', 'environment', 'format', # 'format' を追加 
+'my_deck', 'my_deck_type', 'opponent_deck', 'opponent_deck_type', 'first_second', 'result', 'finish_turn', 'memo' ]
 NEW_ENTRY_LABEL = "（新しい値を入力）"
 SELECT_PLACEHOLDER = "--- 選択してください ---" # 分析用
 ALL_TYPES_PLACEHOLDER = "全タイプ" # 分析用
@@ -28,6 +28,23 @@ def get_app_password():
         st.warning("アプリケーションパスワードがSecretsに設定されていません。ローカルテスト用に 'test_password' を使用します。デプロイ時には必ずSecretsを設定してください。")
         return "test_password" 
 CORRECT_PASSWORD = get_app_password()
+
+# ★追加：クッキーマネージャを初期化
+# 暗号化キーは st.secrets から取得することを強く推奨します。
+# キー名は任意ですが、ここでは "cookie_encryption_key" としています。
+# Streamlit Cloud の場合、Secretsに COOKIE_ENCRYPTION_KEY = "あなた自身の強力な秘密のキー" のように設定してください。
+cookie_encryption_key = st.secrets.get("app_credentials", {}).get("cookie_encryption_key", "YOUR_FALLBACK_DEFAULT_KEY_12345")
+if cookie_encryption_key == "YOUR_FALLBACK_DEFAULT_KEY_12345":
+    st.warning("クッキー暗号化キーがデフォルトのままです。Secretsに 'cookie_encryption_key' を設定してください。")
+
+cookies = EncryptedCookieManager(
+    password=cookie_encryption_key,
+    # クッキーのプレフィックスやパスは必要に応じて設定できます
+    # prefix="streamlit_auth_",
+    # path="/",
+)
+if not cookies.ready(): # クッキーがロードされるまで待機 (通常は不要ですが、念のため)
+    st.stop()
 
 # --- Google Sheets 連携 ---
 SCOPES = [
@@ -100,7 +117,7 @@ def load_data(spreadsheet_id, worksheet_name):
             df['finish_turn'] = pd.to_numeric(df['finish_turn'], errors='coerce').astype('Int64')
         
         string_cols = ['my_deck_type', 'opponent_deck_type', 'my_deck', 'opponent_deck', 
-                       'season', 'memo', 'first_second', 'result', 'environment']
+                       'season', 'memo', 'first_second', 'result', 'environment', 'format'] # formatを追加
         for col in string_cols: # dfに実際に列が存在するか確認してから処理
             if col in df.columns:
                 df[col] = df[col].astype(str).fillna('')
@@ -542,7 +559,7 @@ def show_analysis_section(original_df):
 
 # --- Streamlit アプリ本体 (main関数) ---
 def main():
-    st.set_page_config(layout="wide")
+    
     st.title("カードゲーム戦績管理アプリ (" + SPREADSHEET_NAME_DISPLAY + ")")
 
     if SPREADSHEET_ID == "ここに実際の Waic-戦績 のスプレッドシートIDを貼り付け":
@@ -551,8 +568,23 @@ def main():
         st.code("https://docs.google.com/spreadsheets/d/【この部分がIDです】/edit")
         st.stop()
     
+    # --- ▼▼▼ 認証処理の変更 ▼▼▼ ---
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
+
+    # ★追加：アプリ起動時にクッキーを確認し、自動ログインを試みる
+    if not st.session_state.authenticated: # まだst.session_stateで認証されていなければ
+        try:
+            stored_password_from_cookie = cookies.get('auth_password') # クッキーから保存されたパスワードを取得
+            if stored_password_from_cookie and stored_password_from_cookie == CORRECT_PASSWORD:
+                st.session_state.authenticated = True
+                # 自動ログイン成功時は st.rerun() を呼ばない方がスムーズな場合がある
+                # st.rerun() # 必要に応じて呼び出す
+        except Exception as e:
+            # クッキーのデコードエラーやその他の問題が発生した場合のフォールバック
+            st.warning(f"クッキーの読み取り中にエラーが発生しました: {e}")
+            pass # ログインフォームに進む
+
     if not st.session_state.authenticated:
         st.title("アプリへのログイン")
         login_col1, login_col2, login_col3 = st.columns([1,1,1])
@@ -564,10 +596,24 @@ def main():
                 if login_button:
                     if password_input == CORRECT_PASSWORD:
                         st.session_state.authenticated = True
-                        st.rerun() 
+                        # ★追加：ログイン成功時にパスワードをクッキーに保存
+                        cookies['auth_password'] = CORRECT_PASSWORD
+                        # クッキーの有効期限を設定（例: 365日）
+                        # cookies.set('auth_password', CORRECT_PASSWORD, expires_at=datetime.now() + timedelta(days=365))
+                        # ↑ timedelta を使う場合は from datetime import timedelta が必要
+                        # EncryptedCookieManager では set 時に expires_at を直接は指定できないようです。
+                        # CookieManager の save メソッドでグローバルな有効期限を設定するか、
+                        # ライブラリのドキュメントで詳細な有効期限設定方法を確認する必要があります。
+                        # ここでは、ライブラリのデフォルトの有効期限（またはブラウザセッション）に依存します。
+                        # より長期間の保持のためには、CookieManager の設定を調べるか、
+                        # 単純にキーが存在し、CORRECT_PASSWORDと一致するかどうかで判断します。
+                        # (EncryptedCookieManagerのデフォルトでは永続的なクッキーになることが多いです)
+                        cookies.save() # 変更をクッキーに保存
+                        st.rerun()
                     else:
                         st.error("パスワードが正しくありません。")
         st.stop()
+    # --- ▲▲▲ 認証処理の変更ここまで ▲▲▲ ---
 
     df = load_data(SPREADSHEET_ID, WORKSHEET_NAME)
 
