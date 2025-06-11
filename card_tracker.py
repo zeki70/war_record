@@ -14,7 +14,7 @@ st.set_page_config(layout="wide")
 SPREADSHEET_NAME_DISPLAY = "Waic-戦績"
 SPREADSHEET_ID = "1V9guZQbpV8UDU_W2pC1WBsE1hOHqIO4yTsG8oGzaPQU" # ユーザー提供のID。実際のIDに置き換えてください。
 WORKSHEET_NAME = "シート1"
-COLUMNS = [ 'season', 'date', 'environment', 'format', # 'format' を追加 
+COLUMNS = [ 'season', 'date', 'environment', 
 'my_deck', 'my_deck_type', 'opponent_deck', 'opponent_deck_type', 'first_second', 'result', 'finish_turn', 'memo' ]
 NEW_ENTRY_LABEL = "（新しい値を入力）"
 SELECT_PLACEHOLDER = "--- 選択してください ---" # 分析用
@@ -117,7 +117,7 @@ def load_data(spreadsheet_id, worksheet_name):
             df['finish_turn'] = pd.to_numeric(df['finish_turn'], errors='coerce').astype('Int64')
         
         string_cols = ['my_deck_type', 'opponent_deck_type', 'my_deck', 'opponent_deck', 
-                       'season', 'memo', 'first_second', 'result', 'environment', 'format'] # formatを追加
+                       'season', 'memo', 'first_second', 'result', 'environment'] # formatを削除
         for col in string_cols: # dfに実際に列が存在するか確認してから処理
             if col in df.columns:
                 df[col] = df[col].astype(str).fillna('')
