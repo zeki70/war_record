@@ -372,9 +372,11 @@ def show_analysis_section(original_df):
 
     st.subheader("注目デッキ分析")
     def reset_focus_type_callback(): 
-        st.session_state.ana_focus_deck_type_selector = ALL_TYPES_PLACEHOLDER
-        if 'inp_ana_focus_deck_type_new' in st.session_state:
-            st.session_state.inp_ana_focus_deck_type_new = ""
+        # セッション状態の直接操作を避け、削除のみ行う
+        keys_to_reset = ['ana_focus_deck_type_selector', 'inp_ana_focus_deck_type_new']
+        for key in keys_to_reset:
+            if key in st.session_state:
+                del st.session_state[key]
     deck_names_for_focus_options = [SELECT_PLACEHOLDER] + get_all_analyzable_deck_names(df_for_analysis)
     st.selectbox("注目するデッキアーキタイプを選択:", options=deck_names_for_focus_options, key='ana_focus_deck_name_selector', on_change=reset_focus_type_callback)
     selected_focus_deck = st.session_state.get('ana_focus_deck_name_selector')
