@@ -756,26 +756,15 @@ def main():
                 new_df_row = pd.DataFrame([new_record_data], columns=COLUMNS)
                 if save_data(new_df_row, SPREADSHEET_ID, WORKSHEET_NAME):
                     success_placeholder.success("戦績を記録しました！")
-                    # リセットするキーのリスト (日付は保持)
-                    keys_to_reset_explicitly = {
-                        'inp_first_second': "先攻", # または options[0]
-                        'inp_result': "勝ち",       # または options[0]
-                        'inp_finish_turn': 3,     # デフォルト値
-                        'inp_memo': "",
-                        # 新規入力用のテキストフィールドは、対応するselectboxがリセット(NEW_ENTRY_LABELに)されたらクリアする
-                        # 今回は主要なselectbox（シーズン、デッキ、環境）は保持するので、
-                        # それらに紐づく _new キーも基本的には保持される（もしselectboxがNEW_ENTRY_LABELでなければ）
-                        # もし、selectboxがリセットされる場合は、on_changeコールバックで_newキーもクリアする
-                    }
-                    for key, reset_value in keys_to_reset_explicitly.items():
+                    # セッション状態の直接操作を避け、特定のキーのみクリア
+                    keys_to_clear = [
+                        'inp_memo',  # メモフィールドのみクリア
+                        # 他のフィールドは保持してユーザビリティを向上
+                    ]
+                    for key in keys_to_clear:
                         if key in st.session_state:
-                            st.session_state[key] = reset_value
+                            del st.session_state[key]
                     
-                    # デッキ名や型がNEW_ENTRY_LABELに戻った場合に、対応する_newフィールドをクリア
-                    if st.session_state.get('inp_season_select') == NEW_ENTRY_LABEL and 'inp_season_new' in st.session_state:
-                        st.session_state.inp_season_new = ""
-                    # (他の_newフィールドも同様のロジックをon_changeコールバックで対応済みのはず)
-
                     st.rerun()
                 else:
                     error_placeholder.error("データの保存に失敗しました。Google Sheetsへの接続を確認してください。")
